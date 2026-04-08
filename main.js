@@ -62,7 +62,7 @@ let unsubCommits = null;
 
 function setStatus(text, isError = false) {
   appStatus.textContent = text;
-  appStatus.style.color = isError ? '#f97066' : '#98a2b3';
+  appStatus.style.color = isError ? '#f87171' : '#c5c5d2';
 }
 
 function showApp() {
@@ -322,7 +322,7 @@ loginBtn.addEventListener('click', async () => {
     passwordInput.value = '';
   } catch (err) {
     loginStatus.textContent = `Login failed: ${err.message}`;
-    loginStatus.style.color = '#f97066';
+    loginStatus.style.color = '#f87171';
   }
 });
 
@@ -366,6 +366,6 @@ onAuthStateChanged(auth, async (user) => {
   } catch (err) {
     showLogin();
     loginStatus.textContent = `Setup error: ${err.message}`;
-    loginStatus.style.color = '#f97066';
+    loginStatus.style.color = '#f87171';
   }
 });
