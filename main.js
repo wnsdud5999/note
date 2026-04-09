@@ -11,27 +11,25 @@ import {
   addDoc,
   deleteDoc,
   doc,
-  getDoc,
+  getDocs,
   onSnapshot,
   orderBy,
   query,
   serverTimestamp,
   setDoc,
-  updateDoc
+  updateDoc,
+  where
 } from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js';
 
 // 1) Paste your Firebase Web app config here.
 const firebaseConfig = {
-  apiKey: "AIzaSyDbRIKSvB5OVK9Td8AklSLmayGwh9Geys0",
-  authDomain: "note-2a6f8.firebaseapp.com",
-  projectId: "note-2a6f8",
-  storageBucket: "note-2a6f8.firebasestorage.app",
-  messagingSenderId: "556359673920",
-  appId: "1:556359673920:web:0e56743418cb667d6797a5",
+  apiKey: 'REPLACE_ME',
+  authDomain: 'REPLACE_ME',
+  projectId: 'REPLACE_ME',
+  storageBucket: 'REPLACE_ME',
+  messagingSenderId: 'REPLACE_ME',
+  appId: 'REPLACE_ME'
 };
-
-// 2) Shared login email. Users type only password in UI.
-const SHARED_EMAIL = 'sharedemail@email.com';
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -39,6 +37,7 @@ const db = getFirestore(app);
 
 const loginCard = document.getElementById('loginCard');
 const appCard = document.getElementById('appCard');
+const emailInput = document.getElementById('emailInput');
 const passwordInput = document.getElementById('passwordInput');
 const loginBtn = document.getElementById('loginBtn');
 const loginStatus = document.getElementById('loginStatus');
@@ -59,6 +58,10 @@ let notes = [];
 let selectedNoteId = null;
 let unsubNotes = null;
 let unsubCommits = null;
+
+function getUser() {
+  return auth.currentUser;
+}
 
 function setStatus(text, isError = false) {
   appStatus.textContent = text;
@@ -142,21 +145,29 @@ function selectNote(noteId) {
 }
 
 async function ensureInitialData() {
-  const noteRef = doc(db, 'notes', 'welcome');
-  const existing = await getDoc(noteRef);
+  const user = getUser();
+  if (!user) return;
 
-  if (!existing.exists()) {
+  const notesQuery = query(collection(db, 'notes'), where('ownerUid', '==', user.uid));
+  const notesSnap = await getDocs(notesQuery);
+  const hasAnyNote = !notesSnap.empty;
+
+  if (!hasAnyNote) {
+    const noteRef = doc(collection(db, 'notes'));
+
     await setDoc(noteRef, {
       title: 'Welcome note',
       content: 'Welcome!\n\nCreate notes, edit title/content, and commit changes.',
       updatedAt: serverTimestamp(),
-      updatedBy: 'system'
+      updatedBy: 'system',
+      ownerUid: user.uid
     });
 
-    await addDoc(collection(db, 'notes', 'welcome', 'commits'), {
+    await addDoc(collection(db, 'notes', noteRef.id, 'commits'), {
       author: 'system',
       message: 'Initial note created',
-      ts: serverTimestamp()
+      ts: serverTimestamp(),
+      ownerUid: user.uid
     });
   }
 }
@@ -167,19 +178,23 @@ async function createNote() {
 
   const title = rawTitle.trim() || 'Untitled note';
   const author = authorInput.value.trim() || 'anonymous';
+  const user = getUser();
+  if (!user) return;
   const noteRef = doc(collection(db, 'notes'));
 
   await setDoc(noteRef, {
     title,
     content: '',
     updatedAt: serverTimestamp(),
-    updatedBy: author
+    updatedBy: author,
+    ownerUid: user.uid
   });
 
   await addDoc(collection(db, 'notes', noteRef.id, 'commits'), {
     author,
     message: `Created note "${title}"`,
-    ts: serverTimestamp()
+    ts: serverTimestamp(),
+    ownerUid: user.uid
   });
 
   setStatus('New note created.');
@@ -209,7 +224,8 @@ async function commitCurrentNote() {
     await addDoc(collection(db, 'notes', selectedNoteId, 'commits'), {
       author,
       message,
-      ts: serverTimestamp()
+      ts: serverTimestamp(),
+      ownerUid: getUser()?.uid || null
     });
 
     messageInput.value = '';
@@ -238,7 +254,14 @@ async function deleteCurrentNote() {
 }
 
 function startNotesListener() {
-  const notesQuery = query(collection(db, 'notes'), orderBy('updatedAt', 'desc'));
+  const user = getUser();
+  if (!user) return;
+
+  const notesQuery = query(
+    collection(db, 'notes'),
+    where('ownerUid', '==', user.uid),
+    orderBy('updatedAt', 'desc')
+  );
 
   unsubNotes = onSnapshot(
     notesQuery,
@@ -318,7 +341,16 @@ loginBtn.addEventListener('click', async () => {
   loginStatus.textContent = '';
 
   try {
-    await signInWithEmailAndPassword(auth, SHARED_EMAIL, passwordInput.value);
+    const email = emailInput.value.trim();
+    const password = passwordInput.value;
+    if (!email || !password) {
+      loginStatus.textContent = 'Please enter email and password.';
+      loginStatus.style.color = '#f87171';
+      return;
+    }
+
+    await signInWithEmailAndPassword(auth, email, password);
+    emailInput.value = '';
     passwordInput.value = '';
   } catch (err) {
     loginStatus.textContent = `Login failed: ${err.message}`;
