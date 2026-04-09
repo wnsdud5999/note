@@ -23,13 +23,14 @@ import {
 
 // 1) Paste your Firebase Web app config here.
 const firebaseConfig = {
-  apiKey: "AIzaSyDbRIKSvB5OVK9Td8AklSLmayGwh9Geys0",
-  authDomain: "note-2a6f8.firebaseapp.com",
-  projectId: "note-2a6f8",
-  storageBucket: "note-2a6f8.firebasestorage.app",
-  messagingSenderId: "556359673920",
-  appId: "1:556359673920:web:0e56743418cb667d6797a5",
+  apiKey: 'AIzaSyDbRIKSvB5OVK9Td8AklSLmayGwh9Geys0',
+  authDomain: 'note-2a6f8.firebaseapp.com',
+  projectId: 'note-2a6f8',
+  storageBucket: 'note-2a6f8.firebasestorage.app',
+  messagingSenderId: '556359673920',
+  appId: '1:556359673920:web:0e56743418cb667d6797a5'
 };
+const EMAIL_DOMAIN = 'f1959.com';
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -38,7 +39,6 @@ const db = getFirestore(app);
 const loginCard = document.getElementById('loginCard');
 const appCard = document.getElementById('appCard');
 const emailInput = document.getElementById('emailInput');
-const passwordInput = document.getElementById('passwordInput');
 const loginBtn = document.getElementById('loginBtn');
 const loginStatus = document.getElementById('loginStatus');
 
@@ -110,6 +110,12 @@ function renderNotes() {
 
     noteList.appendChild(li);
   });
+}
+
+function byUpdatedDesc(a, b) {
+  const aTime = a.updatedAt ? a.updatedAt.getTime() : 0;
+  const bTime = b.updatedAt ? b.updatedAt.getTime() : 0;
+  return bTime - aTime;
 }
 
 function renderCommits(items = []) {
@@ -257,11 +263,7 @@ function startNotesListener() {
   const user = getUser();
   if (!user) return;
 
-  const notesQuery = query(
-    collection(db, 'notes'),
-    where('ownerUid', '==', user.uid),
-    orderBy('updatedAt', 'desc')
-  );
+  const notesQuery = query(collection(db, 'notes'), where('ownerUid', '==', user.uid));
 
   unsubNotes = onSnapshot(
     notesQuery,
@@ -276,6 +278,7 @@ function startNotesListener() {
           updatedBy: data.updatedBy || null
         };
       });
+      notes.sort(byUpdatedDesc);
 
       if (!notes.length) {
         selectedNoteId = null;
@@ -341,17 +344,17 @@ loginBtn.addEventListener('click', async () => {
   loginStatus.textContent = '';
 
   try {
-    const email = emailInput.value.trim();
-    const password = passwordInput.value;
-    if (!email || !password) {
-      loginStatus.textContent = 'Please enter email and password.';
+    const idValue = emailInput.value.trim().toLowerCase();
+    if (!idValue) {
+      loginStatus.textContent = 'Please enter ID.';
       loginStatus.style.color = '#f87171';
       return;
     }
 
+    const email = idValue.includes('@') ? idValue : `${idValue}@${EMAIL_DOMAIN}`;
+    const password = idValue.includes('@') ? idValue.split('@')[0] : idValue;
     await signInWithEmailAndPassword(auth, email, password);
     emailInput.value = '';
-    passwordInput.value = '';
   } catch (err) {
     loginStatus.textContent = `Login failed: ${err.message}`;
     loginStatus.style.color = '#f87171';

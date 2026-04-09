@@ -56,13 +56,14 @@ service cloud.firestore {
 }
 ```
 
-## 4) Edit `main.js`
-
-Replace these values:
-- all `REPLACE_ME` entries in `firebaseConfig`
+## 4) `main.js` settings
 
 Important:
-- Users must type their own email + password on login.
+- This repo is now pre-filled with your provided Firebase config for project `note-2a6f8`.
+- Login is ID-based with fixed domain `f1959.com`:
+  - If user types `example`, app signs in as `example@f1959.com`.
+  - Password is also `example` (same as ID before `@`).
+  - If user types full email with `@`, password is still the left side before `@`.
 - Notes are isolated by account (`ownerUid`), so one account cannot read another account's notes.
 
 ## 5) Deploy on GitHub Pages
@@ -76,7 +77,8 @@ Important:
 
 ## What to do on the website
 
-- Enter your account email + password.
+- Enter your account ID only (example: `abc` means `abc@f1959.com`).
+  - Password is automatic and equals your ID (`abc`).
 - Click **+ New note** to create notes.
 - Edit note title + text.
 - Click **Commit changes**.
@@ -90,3 +92,4 @@ Important:
 - **Login failed (`auth/api-key-not-valid`)**: your `firebaseConfig` still has wrong or placeholder values.
 - **Login failed (`auth/invalid-credential`)**: wrong email/password or user account not created.
 - **No notes visible / write errors**: Firestore rules were not applied.
+- **The query requires an index**: fixed in current code by removing the composite-index query pattern.
