@@ -3,11 +3,13 @@ import {
   getAuth,
   signInWithEmailAndPassword,
   signOut,
-  onAuthStateChanged
+  onAuthStateChanged,
+  getIdTokenResult
 } from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js';
 import {
   getFirestore,
   collection,
+  collectionGroup,
   addDoc,
   deleteDoc,
   doc,
@@ -18,7 +20,8 @@ import {
   serverTimestamp,
   setDoc,
   updateDoc,
-  where
+  where,
+  limit
 } from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js';
 
 // 1) Paste your Firebase Web app config here.
@@ -53,11 +56,17 @@ const logoutBtn = document.getElementById('logoutBtn');
 const appStatus = document.getElementById('appStatus');
 const commitList = document.getElementById('commitList');
 const newNoteBtn = document.getElementById('newNoteBtn');
+const adminPanel = document.getElementById('adminPanel');
+const adminCommitList = document.getElementById('adminCommitList');
+const adminDeleteList = document.getElementById('adminDeleteList');
 
 let notes = [];
 let selectedNoteId = null;
 let unsubNotes = null;
 let unsubCommits = null;
+let unsubAdminCommits = null;
+let unsubAdminDeletes = null;
+let isAdmin = false;
 
 function getUser() {
   return auth.currentUser;
@@ -86,6 +95,14 @@ function clearRealtime() {
   if (unsubCommits) {
     unsubCommits();
     unsubCommits = null;
+  }
+  if (unsubAdminCommits) {
+    unsubAdminCommits();
+    unsubAdminCommits = null;
+  }
+  if (unsubAdminDeletes) {
+    unsubAdminDeletes();
+    unsubAdminDeletes = null;
   }
 }
 
@@ -126,6 +143,26 @@ function renderCommits(items = []) {
     const ts = item.ts ? new Date(item.ts).toLocaleString() : 'just now';
     li.textContent = `[${ts}] ${item.author || 'anonymous'}: ${item.message || 'Updated note'}`;
     commitList.appendChild(li);
+  });
+}
+
+function renderAdminCommits(items = []) {
+  adminCommitList.innerHTML = '';
+  items.forEach((item) => {
+    const li = document.createElement('li');
+    const ts = item.ts ? new Date(item.ts).toLocaleString() : 'just now';
+    li.textContent = `[${ts}] ${item.ownerUid || 'unknown'} | ${item.author || 'anonymous'}: ${item.message || 'Updated note'}`;
+    adminCommitList.appendChild(li);
+  });
+}
+
+function renderAdminDeletes(items = []) {
+  adminDeleteList.innerHTML = '';
+  items.forEach((item) => {
+    const li = document.createElement('li');
+    const ts = item.deletedAt ? new Date(item.deletedAt).toLocaleString() : 'just now';
+    li.textContent = `[${ts}] ${item.actorEmail || item.actorUid || 'unknown'} deleted "${item.noteTitle || 'Untitled note'}" (${item.noteId || 'n/a'})`;
+    adminDeleteList.appendChild(li);
   });
 }
 
@@ -253,10 +290,29 @@ async function deleteCurrentNote() {
   const ok = window.confirm(`Delete note "${selected?.title || 'Untitled note'}"?`);
   if (!ok) return;
 
+  await addDoc(collection(db, 'audit_logs'), {
+    type: 'note_deleted',
+    noteId: selectedNoteId,
+    noteTitle: selected?.title || 'Untitled note',
+    actorUid: getUser()?.uid || null,
+    actorEmail: getUser()?.email || null,
+    deletedAt: serverTimestamp()
+  });
+
   await deleteDoc(doc(db, 'notes', selectedNoteId));
   selectedNoteId = null;
   clearEditorPanels();
   setStatus('Note deleted.');
+}
+
+function showAdminPanel() {
+  adminPanel.classList.remove('hidden');
+}
+
+function hideAdminPanel() {
+  adminPanel.classList.add('hidden');
+  renderAdminCommits([]);
+  renderAdminDeletes([]);
 }
 
 function startNotesListener() {
@@ -340,6 +396,56 @@ function startCommitListener() {
   );
 }
 
+function startAdminListeners() {
+  if (!isAdmin) {
+    hideAdminPanel();
+    return;
+  }
+
+  showAdminPanel();
+
+  const allCommitsQuery = query(collectionGroup(db, 'commits'), orderBy('ts', 'desc'), limit(200));
+  unsubAdminCommits = onSnapshot(
+    allCommitsQuery,
+    (snapshot) => {
+      const items = snapshot.docs.map((snap) => {
+        const data = snap.data();
+        return {
+          ownerUid: data.ownerUid || null,
+          author: data.author || 'anonymous',
+          message: data.message || 'Updated note',
+          ts: data.ts?.toDate?.() ?? null
+        };
+      });
+      renderAdminCommits(items);
+    },
+    (err) => {
+      setStatus(err.message, true);
+    }
+  );
+
+  const deletesQuery = query(collection(db, 'audit_logs'), orderBy('deletedAt', 'desc'), limit(200));
+  unsubAdminDeletes = onSnapshot(
+    deletesQuery,
+    (snapshot) => {
+      const items = snapshot.docs.map((snap) => {
+        const data = snap.data();
+        return {
+          actorUid: data.actorUid || null,
+          actorEmail: data.actorEmail || null,
+          noteId: data.noteId || null,
+          noteTitle: data.noteTitle || 'Untitled note',
+          deletedAt: data.deletedAt?.toDate?.() ?? null
+        };
+      });
+      renderAdminDeletes(items);
+    },
+    (err) => {
+      setStatus(err.message, true);
+    }
+  );
+}
+
 loginBtn.addEventListener('click', async () => {
   loginStatus.textContent = '';
 
@@ -385,16 +491,21 @@ logoutBtn.addEventListener('click', async () => {
 onAuthStateChanged(auth, async (user) => {
   if (!user) {
     clearRealtime();
+    isAdmin = false;
+    hideAdminPanel();
     showLogin();
     return;
   }
 
   try {
+    const tokenResult = await getIdTokenResult(user, true);
+    isAdmin = Boolean(tokenResult.claims?.admin);
     await ensureInitialData();
 
     if (!unsubNotes) {
       startNotesListener();
     }
+    startAdminListeners();
 
     showApp();
     setStatus('Connected.');

@@ -46,9 +46,12 @@
       .commits { margin-top: 12px; border-top: 1px solid #4a4b58; padding-top: 12px; }
       .commits ul { list-style: none; margin: 0; padding: 0; }
       .commits li { margin: 8px 0; font-size: 0.9rem; color: #ececf1; }
+      .adminPanel { margin-top: 14px; border: 1px solid #4a4b58; border-radius: 12px; padding: 12px; background: #2f303a; }
+      .adminGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
       ::placeholder { color: #b4b4c6; }
       @media (max-width: 900px) {
         .appGrid { grid-template-columns: 1fr; }
+        .adminGrid { grid-template-columns: 1fr; }
       }
     </style>
   </head>
@@ -92,6 +95,20 @@
             <div class="commits">
               <h3>Recent commits (selected note)</h3>
               <ul id="commitList"></ul>
+            </div>
+          </div>
+        </div>
+
+        <div id="adminPanel" class="adminPanel hidden">
+          <h3>Admin dashboard</h3>
+          <div class="adminGrid">
+            <div class="commits">
+              <h3>All user commits</h3>
+              <ul id="adminCommitList"></ul>
+            </div>
+            <div class="commits">
+              <h3>Delete history</h3>
+              <ul id="adminDeleteList"></ul>
             </div>
           </div>
         </div>
