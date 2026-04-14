@@ -42,8 +42,6 @@ const db = getFirestore(app);
 const loginCard = document.getElementById('loginCard');
 const appCard = document.getElementById('appCard');
 const emailInput = document.getElementById('emailInput');
-const adminPasswordRow = document.getElementById('adminPasswordRow');
-const adminPasswordInput = document.getElementById('adminPasswordInput');
 const loginBtn = document.getElementById('loginBtn');
 const loginStatus = document.getElementById('loginStatus');
 
@@ -162,7 +160,14 @@ function renderAdminCommits(items = []) {
   items.forEach((item) => {
     const li = document.createElement('li');
     const ts = item.ts ? new Date(item.ts).toLocaleString() : 'just now';
-    li.textContent = `[${ts}] ${item.ownerUid || 'unknown'} | ${item.author || 'anonymous'}: ${item.message || 'Updated note'}`;
+    li.textContent = `[${ts}] ${item.actorEmail || item.ownerUid || 'unknown'} | ${item.author || 'anonymous'}: ${item.message || 'Updated note'}`;
+    li.style.cursor = 'pointer';
+    li.title = '클릭해서 상세 보기';
+    li.addEventListener('click', () => {
+      window.alert(
+        `사용자: ${item.actorEmail || item.ownerUid || 'unknown'}\n날짜: ${ts}\n제목: ${item.titleSnapshot || '(없음)'}\n메시지: ${item.message || 'Updated note'}\n\n내용:\n${item.contentSnapshot || '(내용 없음)'}`
+      );
+    });
     adminCommitList.appendChild(li);
   });
 }
@@ -172,7 +177,14 @@ function renderAdminDeletes(items = []) {
   items.forEach((item) => {
     const li = document.createElement('li');
     const ts = item.deletedAt ? new Date(item.deletedAt).toLocaleString() : 'just now';
-    li.textContent = `[${ts}] ${item.actorEmail || item.actorUid || 'unknown'} deleted "${item.noteTitle || 'Untitled note'}" (${item.noteId || 'n/a'})`;
+    li.textContent = `[${ts}] ${item.actorEmail || item.actorUid || 'unknown'} deleted "${item.noteTitle || 'Untitled note'}"`;
+    li.style.cursor = 'pointer';
+    li.title = '클릭해서 상세 보기';
+    li.addEventListener('click', () => {
+      window.alert(
+        `사용자: ${item.actorEmail || item.actorUid || 'unknown'}\n날짜: ${ts}\n삭제된 노트: ${item.noteTitle || 'Untitled note'}\n노트 ID: ${item.noteId || 'n/a'}\n\n삭제 당시 내용:\n${item.deletedContent || '(내용 없음)'}`
+      );
+    });
     adminDeleteList.appendChild(li);
   });
 }
@@ -221,7 +233,10 @@ async function ensureInitialData() {
       author: 'system',
       message: 'Initial note created',
       ts: serverTimestamp(),
-      ownerUid: user.uid
+      ownerUid: user.uid,
+      actorEmail: user.email || null,
+      titleSnapshot: 'Welcome note',
+      contentSnapshot: 'Welcome!\n\nCreate notes, edit title/content, and commit changes.'
     });
   }
 }
@@ -248,7 +263,10 @@ async function createNote() {
     author,
     message: `Created note "${title}"`,
     ts: serverTimestamp(),
-    ownerUid: user.uid
+    ownerUid: user.uid,
+    actorEmail: user.email || null,
+    titleSnapshot: title,
+    contentSnapshot: ''
   });
 
   setStatus('New note created.');
@@ -279,7 +297,10 @@ async function commitCurrentNote() {
       author,
       message,
       ts: serverTimestamp(),
-      ownerUid: getUser()?.uid || null
+      ownerUid: getUser()?.uid || null,
+      actorEmail: getUser()?.email || null,
+      titleSnapshot: noteTitleInput.value.trim() || 'Untitled note',
+      contentSnapshot: editor.value
     });
 
     messageInput.value = '';
@@ -307,6 +328,7 @@ async function deleteCurrentNote() {
     noteTitle: selected?.title || 'Untitled note',
     actorUid: getUser()?.uid || null,
     actorEmail: getUser()?.email || null,
+    deletedContent: selected?.content || '',
     deletedAt: serverTimestamp()
   });
 
@@ -423,8 +445,11 @@ function startAdminListeners() {
         const data = snap.data();
         return {
           ownerUid: data.ownerUid || null,
+          actorEmail: data.actorEmail || null,
           author: data.author || 'anonymous',
           message: data.message || 'Updated note',
+          titleSnapshot: data.titleSnapshot || null,
+          contentSnapshot: data.contentSnapshot || null,
           ts: data.ts?.toDate?.() ?? null
         };
       });
@@ -447,6 +472,7 @@ function startAdminListeners() {
           actorEmail: data.actorEmail || null,
           noteId: data.noteId || null,
           noteTitle: data.noteTitle || 'Untitled note',
+          deletedContent: data.deletedContent || '',
           deletedAt: data.deletedAt?.toDate?.() ?? null
         };
       });
@@ -472,20 +498,10 @@ loginBtn.addEventListener('click', async () => {
     const email = idValue.includes('@') ? idValue : `${idValue}@${EMAIL_DOMAIN}`;
     const idPart = idValue.includes('@') ? idValue.split('@')[0] : idValue;
     const isAdminLogin = ADMIN_IDS.includes(idPart) || ADMIN_EMAILS.includes(email);
-    if (!isAdminLogin) {
-      adminPasswordRow.classList.add('hidden');
-      adminPasswordInput.value = '';
-    }
 
-    if (isAdminLogin && adminPasswordRow.classList.contains('hidden')) {
-      adminPasswordRow.classList.remove('hidden');
-      loginStatus.textContent = '관리자 비밀번호를 입력한 뒤 다시 로그인 버튼을 눌러주세요.';
-      loginStatus.style.color = '#c5c5d2';
-      adminPasswordInput.focus();
-      return;
-    }
-
-    const password = isAdminLogin ? adminPasswordInput.value : idPart;
+    const password = isAdminLogin
+      ? window.prompt('관리자 비밀번호를 입력해주세요.')
+      : idPart;
     if (isAdminLogin && !password) {
       loginStatus.textContent = '관리자 비밀번호를 입력해주세요.';
       loginStatus.style.color = '#f87171';
@@ -494,8 +510,6 @@ loginBtn.addEventListener('click', async () => {
 
     await signInWithEmailAndPassword(auth, email, password);
     emailInput.value = '';
-    adminPasswordInput.value = '';
-    adminPasswordRow.classList.add('hidden');
   } catch (err) {
     loginStatus.textContent = `Login failed: ${err.message}`;
     loginStatus.style.color = '#f87171';

@@ -78,7 +78,7 @@ Important:
   - If user types full email with `@`, password is still the left side before `@`.
 - Admin login is dual-step:
   - First screen shows only one ID input.
-  - If login attempt ID/email matches an admin account in `ADMIN_EMAILS`, then extra admin password field appears.
+  - If login attempt ID/email matches an admin account in `ADMIN_EMAILS`, a password popup appears.
   - Admin password is the real Firebase Auth password for that admin account.
 - Admin account is email-based (no npm/local script needed):
   - Edit `ADMIN_EMAILS` in `main.js` (default: `admin@f1959.com`).
@@ -100,6 +100,7 @@ Important:
 4. That admin user will see:
    - **All user commits** (collection group view)
    - **Delete history** from `audit_logs`
+   - Click each history row to see full detail (user/date/content snapshot)
 5. Normal users will not see admin panel and cannot read `audit_logs`.
 6. If admin dashboard is empty:
    - Make sure Firestore Rules were published with your admin email in `isAdmin()`.
@@ -117,7 +118,7 @@ Quick checklist:
 
 - Enter your account ID only (example: `abc` means `abc@f1959.com`).
   - Password is automatic and equals your ID (`abc`).
-- If you enter admin ID/email, enter admin password in the extra field.
+- If you enter admin ID/email, enter admin password in the popup.
 - Click **+ New note** to create notes.
 - Edit note title + text.
 - Click **Copy all** to copy all text in the current note body.
