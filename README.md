@@ -62,7 +62,8 @@ service cloud.firestore {
     match /audit_logs/{logId} {
       allow create: if signedIn();
       allow read: if isAdmin();
-      allow update, delete: if false;
+      allow update: if false;
+      allow delete: if isAdmin();
     }
   }
 }
@@ -78,7 +79,7 @@ Important:
   - If user types full email with `@`, password is still the left side before `@`.
 - Admin login is dual-step:
   - First screen shows only one ID input.
-  - If login attempt ID/email matches an admin account in `ADMIN_EMAILS`, a password popup appears.
+  - If login attempt ID/email matches an admin account in `ADMIN_EMAILS`, a password modal appears.
   - Admin password is the real Firebase Auth password for that admin account.
 - Admin account is email-based (no npm/local script needed):
   - Edit `ADMIN_EMAILS` in `main.js` (default: `admin@f1959.com`).
@@ -101,6 +102,8 @@ Important:
    - **All user commits** (collection group view)
    - **Delete history** from `audit_logs`
    - Click each history row to see full detail (user/date/content snapshot)
+   - Pagination (10 per page) for both commit and delete lists
+   - Audit logs older than 30 days are auto-cleaned by admin session
 5. Normal users will not see admin panel and cannot read `audit_logs`.
 6. If admin dashboard is empty:
    - Make sure Firestore Rules were published with your admin email in `isAdmin()`.
@@ -136,3 +139,4 @@ Quick checklist:
 - **The query requires an index**: fixed in current code by removing the composite-index query pattern.
 - **Admin dashboard not visible**: check `ADMIN_EMAILS` in `main.js` and `isAdmin()` email list in Firestore rules, then logout/login.
 - **Admin can login but sees permission errors / no data**: Firestore Rules `isAdmin()` email mismatch or rules not published yet.
+- **Delete history does not auto-clean after 30 days**: update Firestore Rules so admin can delete `audit_logs` entries.

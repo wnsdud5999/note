@@ -48,6 +48,23 @@
       .commits li { margin: 8px 0; font-size: 0.9rem; color: #ececf1; }
       .adminPanel { margin-top: 14px; border: 1px solid #4a4b58; border-radius: 12px; padding: 12px; background: #2f303a; }
       .adminGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+      .pager { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+      .modal {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.55);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+      }
+      .modalCard {
+        width: min(420px, calc(100vw - 32px));
+        background: #2f303a;
+        border: 1px solid #4a4b58;
+        border-radius: 12px;
+        padding: 14px;
+      }
       ::placeholder { color: #b4b4c6; }
       @media (max-width: 900px) {
         .appGrid { grid-template-columns: 1fr; }
@@ -108,12 +125,33 @@
             <div class="commits">
               <h3>All user commits</h3>
               <ul id="adminCommitList"></ul>
+              <div class="pager">
+                <button id="adminCommitsPrevBtn" class="secondary">Prev</button>
+                <span id="adminCommitsPage" class="status">Page 1</span>
+                <button id="adminCommitsNextBtn" class="secondary">Next</button>
+              </div>
             </div>
             <div class="commits">
               <h3>Delete history</h3>
               <ul id="adminDeleteList"></ul>
+              <div class="pager">
+                <button id="adminDeletesPrevBtn" class="secondary">Prev</button>
+                <span id="adminDeletesPage" class="status">Page 1</span>
+                <button id="adminDeletesNextBtn" class="secondary">Next</button>
+              </div>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="adminPasswordModal" class="modal hidden">
+      <div class="modalCard">
+        <h3>관리자 비밀번호</h3>
+        <input id="adminPasswordModalInput" type="password" style="width: 100%; box-sizing: border-box" />
+        <div class="row" style="justify-content: flex-end">
+          <button id="adminPasswordCancelBtn" class="secondary">취소</button>
+          <button id="adminPasswordConfirmBtn">확인</button>
         </div>
       </div>
     </div>

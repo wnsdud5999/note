@@ -60,6 +60,16 @@ const newNoteBtn = document.getElementById('newNoteBtn');
 const adminPanel = document.getElementById('adminPanel');
 const adminCommitList = document.getElementById('adminCommitList');
 const adminDeleteList = document.getElementById('adminDeleteList');
+const adminCommitsPrevBtn = document.getElementById('adminCommitsPrevBtn');
+const adminCommitsNextBtn = document.getElementById('adminCommitsNextBtn');
+const adminCommitsPage = document.getElementById('adminCommitsPage');
+const adminDeletesPrevBtn = document.getElementById('adminDeletesPrevBtn');
+const adminDeletesNextBtn = document.getElementById('adminDeletesNextBtn');
+const adminDeletesPage = document.getElementById('adminDeletesPage');
+const adminPasswordModal = document.getElementById('adminPasswordModal');
+const adminPasswordModalInput = document.getElementById('adminPasswordModalInput');
+const adminPasswordConfirmBtn = document.getElementById('adminPasswordConfirmBtn');
+const adminPasswordCancelBtn = document.getElementById('adminPasswordCancelBtn');
 
 let notes = [];
 let selectedNoteId = null;
@@ -68,8 +78,13 @@ let unsubCommits = null;
 let unsubAdminCommits = null;
 let unsubAdminDeletes = null;
 let isAdmin = false;
+let adminCommitsAll = [];
+let adminDeletesAll = [];
+let adminCommitsPageIndex = 0;
+let adminDeletesPageIndex = 0;
 
 const ADMIN_IDS = ADMIN_EMAILS.map((email) => email.split('@')[0].toLowerCase());
+const ADMIN_PAGE_SIZE = 10;
 
 function getUser() {
   return auth.currentUser;
@@ -156,8 +171,14 @@ function renderCommits(items = []) {
 }
 
 function renderAdminCommits(items = []) {
+  const totalPages = Math.max(1, Math.ceil(items.length / ADMIN_PAGE_SIZE));
+  if (adminCommitsPageIndex > totalPages - 1) adminCommitsPageIndex = totalPages - 1;
+  if (adminCommitsPageIndex < 0) adminCommitsPageIndex = 0;
+  const start = adminCommitsPageIndex * ADMIN_PAGE_SIZE;
+  const pageItems = items.slice(start, start + ADMIN_PAGE_SIZE);
+
   adminCommitList.innerHTML = '';
-  items.forEach((item) => {
+  pageItems.forEach((item) => {
     const li = document.createElement('li');
     const ts = item.ts ? new Date(item.ts).toLocaleString() : 'just now';
     li.textContent = `[${ts}] ${item.actorEmail || item.ownerUid || 'unknown'} | ${item.author || 'anonymous'}: ${item.message || 'Updated note'}`;
@@ -170,11 +191,26 @@ function renderAdminCommits(items = []) {
     });
     adminCommitList.appendChild(li);
   });
+  if (!pageItems.length) {
+    const li = document.createElement('li');
+    li.textContent = '표시할 커밋이 없습니다.';
+    adminCommitList.appendChild(li);
+  }
+
+  adminCommitsPage.textContent = `Page ${adminCommitsPageIndex + 1} / ${totalPages}`;
+  adminCommitsPrevBtn.disabled = adminCommitsPageIndex === 0;
+  adminCommitsNextBtn.disabled = adminCommitsPageIndex >= totalPages - 1;
 }
 
 function renderAdminDeletes(items = []) {
+  const totalPages = Math.max(1, Math.ceil(items.length / ADMIN_PAGE_SIZE));
+  if (adminDeletesPageIndex > totalPages - 1) adminDeletesPageIndex = totalPages - 1;
+  if (adminDeletesPageIndex < 0) adminDeletesPageIndex = 0;
+  const start = adminDeletesPageIndex * ADMIN_PAGE_SIZE;
+  const pageItems = items.slice(start, start + ADMIN_PAGE_SIZE);
+
   adminDeleteList.innerHTML = '';
-  items.forEach((item) => {
+  pageItems.forEach((item) => {
     const li = document.createElement('li');
     const ts = item.deletedAt ? new Date(item.deletedAt).toLocaleString() : 'just now';
     li.textContent = `[${ts}] ${item.actorEmail || item.actorUid || 'unknown'} deleted "${item.noteTitle || 'Untitled note'}"`;
@@ -187,6 +223,15 @@ function renderAdminDeletes(items = []) {
     });
     adminDeleteList.appendChild(li);
   });
+  if (!pageItems.length) {
+    const li = document.createElement('li');
+    li.textContent = '표시할 삭제 기록이 없습니다.';
+    adminDeleteList.appendChild(li);
+  }
+
+  adminDeletesPage.textContent = `Page ${adminDeletesPageIndex + 1} / ${totalPages}`;
+  adminDeletesPrevBtn.disabled = adminDeletesPageIndex === 0;
+  adminDeletesNextBtn.disabled = adminDeletesPageIndex >= totalPages - 1;
 }
 
 function getSelectedNote() {
@@ -344,8 +389,12 @@ function showAdminPanel() {
 
 function hideAdminPanel() {
   adminPanel.classList.add('hidden');
-  renderAdminCommits([]);
-  renderAdminDeletes([]);
+  adminCommitsAll = [];
+  adminDeletesAll = [];
+  adminCommitsPageIndex = 0;
+  adminDeletesPageIndex = 0;
+  renderAdminCommits(adminCommitsAll);
+  renderAdminDeletes(adminDeletesAll);
 }
 
 function startNotesListener() {
@@ -454,7 +503,8 @@ function startAdminListeners() {
         };
       });
       items.sort((a, b) => byTimeDesc(a, b, 'ts'));
-      renderAdminCommits(items);
+      adminCommitsAll = items;
+      renderAdminCommits(adminCommitsAll);
     },
     (err) => {
       setStatus(err.message, true);
@@ -464,7 +514,20 @@ function startAdminListeners() {
   const deletesQuery = query(collection(db, 'audit_logs'), orderBy('deletedAt', 'desc'), limit(200));
   unsubAdminDeletes = onSnapshot(
     deletesQuery,
-    (snapshot) => {
+    async (snapshot) => {
+      const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+      for (const snap of snapshot.docs) {
+        const d = snap.data();
+        const dt = d.deletedAt?.toDate?.();
+        if (dt && dt.getTime() < cutoff) {
+          try {
+            await deleteDoc(snap.ref);
+          } catch (_err) {
+            // rules may block deletion if not updated; ignore here.
+          }
+        }
+      }
+
       const items = snapshot.docs.map((snap) => {
         const data = snap.data();
         return {
@@ -476,12 +539,45 @@ function startAdminListeners() {
           deletedAt: data.deletedAt?.toDate?.() ?? null
         };
       });
-      renderAdminDeletes(items);
+      const filtered = items.filter((item) => {
+        if (!item.deletedAt) return true;
+        return item.deletedAt.getTime() >= cutoff;
+      });
+      adminDeletesAll = filtered;
+      renderAdminDeletes(adminDeletesAll);
     },
     (err) => {
       setStatus(err.message, true);
     }
   );
+}
+
+function openAdminPasswordModal() {
+  return new Promise((resolve) => {
+    adminPasswordModal.classList.remove('hidden');
+    adminPasswordModalInput.value = '';
+    adminPasswordModalInput.focus();
+
+    const cleanup = () => {
+      adminPasswordConfirmBtn.removeEventListener('click', onConfirm);
+      adminPasswordCancelBtn.removeEventListener('click', onCancel);
+      adminPasswordModal.classList.add('hidden');
+    };
+
+    const onConfirm = () => {
+      const value = adminPasswordModalInput.value;
+      cleanup();
+      resolve(value || null);
+    };
+
+    const onCancel = () => {
+      cleanup();
+      resolve(null);
+    };
+
+    adminPasswordConfirmBtn.addEventListener('click', onConfirm);
+    adminPasswordCancelBtn.addEventListener('click', onCancel);
+  });
 }
 
 loginBtn.addEventListener('click', async () => {
@@ -499,9 +595,7 @@ loginBtn.addEventListener('click', async () => {
     const idPart = idValue.includes('@') ? idValue.split('@')[0] : idValue;
     const isAdminLogin = ADMIN_IDS.includes(idPart) || ADMIN_EMAILS.includes(email);
 
-    const password = isAdminLogin
-      ? window.prompt('관리자 비밀번호를 입력해주세요.')
-      : idPart;
+    const password = isAdminLogin ? await openAdminPasswordModal() : idPart;
     if (isAdminLogin && !password) {
       loginStatus.textContent = '관리자 비밀번호를 입력해주세요.';
       loginStatus.style.color = '#f87171';
@@ -514,6 +608,23 @@ loginBtn.addEventListener('click', async () => {
     loginStatus.textContent = `Login failed: ${err.message}`;
     loginStatus.style.color = '#f87171';
   }
+});
+
+adminCommitsPrevBtn.addEventListener('click', () => {
+  adminCommitsPageIndex -= 1;
+  renderAdminCommits(adminCommitsAll);
+});
+adminCommitsNextBtn.addEventListener('click', () => {
+  adminCommitsPageIndex += 1;
+  renderAdminCommits(adminCommitsAll);
+});
+adminDeletesPrevBtn.addEventListener('click', () => {
+  adminDeletesPageIndex -= 1;
+  renderAdminDeletes(adminDeletesAll);
+});
+adminDeletesNextBtn.addEventListener('click', () => {
+  adminDeletesPageIndex += 1;
+  renderAdminDeletes(adminDeletesAll);
 });
 
 newNoteBtn.addEventListener('click', async () => {
