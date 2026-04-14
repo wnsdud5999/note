@@ -140,6 +140,12 @@ function byUpdatedDesc(a, b) {
   return bTime - aTime;
 }
 
+function byTimeDesc(a, b, key) {
+  const aTime = a[key] ? a[key].getTime() : 0;
+  const bTime = b[key] ? b[key].getTime() : 0;
+  return bTime - aTime;
+}
+
 function renderCommits(items = []) {
   commitList.innerHTML = '';
 
@@ -409,7 +415,7 @@ function startAdminListeners() {
 
   showAdminPanel();
 
-  const allCommitsQuery = query(collectionGroup(db, 'commits'), orderBy('ts', 'desc'), limit(200));
+  const allCommitsQuery = query(collectionGroup(db, 'commits'), limit(200));
   unsubAdminCommits = onSnapshot(
     allCommitsQuery,
     (snapshot) => {
@@ -422,6 +428,7 @@ function startAdminListeners() {
           ts: data.ts?.toDate?.() ?? null
         };
       });
+      items.sort((a, b) => byTimeDesc(a, b, 'ts'));
       renderAdminCommits(items);
     },
     (err) => {
@@ -465,6 +472,19 @@ loginBtn.addEventListener('click', async () => {
     const email = idValue.includes('@') ? idValue : `${idValue}@${EMAIL_DOMAIN}`;
     const idPart = idValue.includes('@') ? idValue.split('@')[0] : idValue;
     const isAdminLogin = ADMIN_IDS.includes(idPart) || ADMIN_EMAILS.includes(email);
+    if (!isAdminLogin) {
+      adminPasswordRow.classList.add('hidden');
+      adminPasswordInput.value = '';
+    }
+
+    if (isAdminLogin && adminPasswordRow.classList.contains('hidden')) {
+      adminPasswordRow.classList.remove('hidden');
+      loginStatus.textContent = '관리자 비밀번호를 입력한 뒤 다시 로그인 버튼을 눌러주세요.';
+      loginStatus.style.color = '#c5c5d2';
+      adminPasswordInput.focus();
+      return;
+    }
+
     const password = isAdminLogin ? adminPasswordInput.value : idPart;
     if (isAdminLogin && !password) {
       loginStatus.textContent = '관리자 비밀번호를 입력해주세요.';
@@ -475,23 +495,10 @@ loginBtn.addEventListener('click', async () => {
     await signInWithEmailAndPassword(auth, email, password);
     emailInput.value = '';
     adminPasswordInput.value = '';
+    adminPasswordRow.classList.add('hidden');
   } catch (err) {
     loginStatus.textContent = `Login failed: ${err.message}`;
     loginStatus.style.color = '#f87171';
-  }
-});
-
-emailInput.addEventListener('input', () => {
-  const idValue = emailInput.value.trim().toLowerCase();
-  const idPart = idValue.includes('@') ? idValue.split('@')[0] : idValue;
-  const email = idValue.includes('@') ? idValue : `${idValue}@${EMAIL_DOMAIN}`;
-  const needsAdminPassword = ADMIN_IDS.includes(idPart) || ADMIN_EMAILS.includes(email);
-
-  if (needsAdminPassword) {
-    adminPasswordRow.classList.remove('hidden');
-  } else {
-    adminPasswordRow.classList.add('hidden');
-    adminPasswordInput.value = '';
   }
 });
 

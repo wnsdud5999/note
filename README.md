@@ -77,7 +77,8 @@ Important:
   - Password is also `example` (same as ID before `@`).
   - If user types full email with `@`, password is still the left side before `@`.
 - Admin login is dual-step:
-  - If login ID/email matches an admin account in `ADMIN_EMAILS`, an extra admin password field appears.
+  - First screen shows only one ID input.
+  - If login attempt ID/email matches an admin account in `ADMIN_EMAILS`, then extra admin password field appears.
   - Admin password is the real Firebase Auth password for that admin account.
 - Admin account is email-based (no npm/local script needed):
   - Edit `ADMIN_EMAILS` in `main.js` (default: `admin@f1959.com`).
@@ -100,6 +101,9 @@ Important:
    - **All user commits** (collection group view)
    - **Delete history** from `audit_logs`
 5. Normal users will not see admin panel and cannot read `audit_logs`.
+6. If admin dashboard is empty:
+   - Make sure Firestore Rules were published with your admin email in `isAdmin()`.
+   - Existing delete history appears only after someone actually deletes notes.
 
 Quick checklist:
 - Firebase Auth has user `admin@f1959.com` with a strong password.
@@ -130,3 +134,4 @@ Quick checklist:
 - **No notes visible / write errors**: Firestore rules were not applied.
 - **The query requires an index**: fixed in current code by removing the composite-index query pattern.
 - **Admin dashboard not visible**: check `ADMIN_EMAILS` in `main.js` and `isAdmin()` email list in Firestore rules, then logout/login.
+- **Admin can login but sees permission errors / no data**: Firestore Rules `isAdmin()` email mismatch or rules not published yet.
