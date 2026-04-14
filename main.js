@@ -3,8 +3,7 @@ import {
   getAuth,
   signInWithEmailAndPassword,
   signOut,
-  onAuthStateChanged,
-  getIdTokenResult
+  onAuthStateChanged
 } from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js';
 import {
   getFirestore,
@@ -34,6 +33,7 @@ const firebaseConfig = {
   appId: '1:556359673920:web:0e56743418cb667d6797a5'
 };
 const EMAIL_DOMAIN = 'f1959.com';
+const ADMIN_EMAILS = ['admin@f1959.com'];
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -42,11 +42,14 @@ const db = getFirestore(app);
 const loginCard = document.getElementById('loginCard');
 const appCard = document.getElementById('appCard');
 const emailInput = document.getElementById('emailInput');
+const adminPasswordRow = document.getElementById('adminPasswordRow');
+const adminPasswordInput = document.getElementById('adminPasswordInput');
 const loginBtn = document.getElementById('loginBtn');
 const loginStatus = document.getElementById('loginStatus');
 
 const noteList = document.getElementById('noteList');
 const noteTitleInput = document.getElementById('noteTitleInput');
+const copyAllBtn = document.getElementById('copyAllBtn');
 const editor = document.getElementById('editor');
 const authorInput = document.getElementById('authorInput');
 const messageInput = document.getElementById('messageInput');
@@ -67,6 +70,8 @@ let unsubCommits = null;
 let unsubAdminCommits = null;
 let unsubAdminDeletes = null;
 let isAdmin = false;
+
+const ADMIN_IDS = ADMIN_EMAILS.map((email) => email.split('@')[0].toLowerCase());
 
 function getUser() {
   return auth.currentUser;
@@ -458,12 +463,35 @@ loginBtn.addEventListener('click', async () => {
     }
 
     const email = idValue.includes('@') ? idValue : `${idValue}@${EMAIL_DOMAIN}`;
-    const password = idValue.includes('@') ? idValue.split('@')[0] : idValue;
+    const idPart = idValue.includes('@') ? idValue.split('@')[0] : idValue;
+    const isAdminLogin = ADMIN_IDS.includes(idPart) || ADMIN_EMAILS.includes(email);
+    const password = isAdminLogin ? adminPasswordInput.value : idPart;
+    if (isAdminLogin && !password) {
+      loginStatus.textContent = '관리자 비밀번호를 입력해주세요.';
+      loginStatus.style.color = '#f87171';
+      return;
+    }
+
     await signInWithEmailAndPassword(auth, email, password);
     emailInput.value = '';
+    adminPasswordInput.value = '';
   } catch (err) {
     loginStatus.textContent = `Login failed: ${err.message}`;
     loginStatus.style.color = '#f87171';
+  }
+});
+
+emailInput.addEventListener('input', () => {
+  const idValue = emailInput.value.trim().toLowerCase();
+  const idPart = idValue.includes('@') ? idValue.split('@')[0] : idValue;
+  const email = idValue.includes('@') ? idValue : `${idValue}@${EMAIL_DOMAIN}`;
+  const needsAdminPassword = ADMIN_IDS.includes(idPart) || ADMIN_EMAILS.includes(email);
+
+  if (needsAdminPassword) {
+    adminPasswordRow.classList.remove('hidden');
+  } else {
+    adminPasswordRow.classList.add('hidden');
+    adminPasswordInput.value = '';
   }
 });
 
@@ -488,6 +516,19 @@ logoutBtn.addEventListener('click', async () => {
   await signOut(auth);
 });
 
+copyAllBtn.addEventListener('click', async () => {
+  try {
+    if (!editor.value) {
+      setStatus('복사할 내용이 없습니다.', true);
+      return;
+    }
+    await navigator.clipboard.writeText(editor.value);
+    setStatus('내용 전체를 복사했습니다.');
+  } catch (_err) {
+    setStatus('복사에 실패했습니다. 브라우저 권한을 확인해주세요.', true);
+  }
+});
+
 onAuthStateChanged(auth, async (user) => {
   if (!user) {
     clearRealtime();
@@ -498,8 +539,7 @@ onAuthStateChanged(auth, async (user) => {
   }
 
   try {
-    const tokenResult = await getIdTokenResult(user, true);
-    isAdmin = Boolean(tokenResult.claims?.admin);
+    isAdmin = ADMIN_EMAILS.includes((user.email || '').toLowerCase());
     await ensureInitialData();
 
     if (!unsubNotes) {

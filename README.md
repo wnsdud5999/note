@@ -38,7 +38,11 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() { return request.auth != null; }
-    function isAdmin() { return signedIn() && request.auth.token.admin == true; }
+    function isAdmin() {
+      return signedIn()
+        && request.auth.token.email != null
+        && request.auth.token.email in ['admin@f1959.com'];
+    }
     function isOwner(uid) { return signedIn() && request.auth.uid == uid; }
 
     match /notes/{noteId} {
@@ -72,6 +76,12 @@ Important:
   - If user types `example`, app signs in as `example@f1959.com`.
   - Password is also `example` (same as ID before `@`).
   - If user types full email with `@`, password is still the left side before `@`.
+- Admin login is dual-step:
+  - If login ID/email matches an admin account in `ADMIN_EMAILS`, an extra admin password field appears.
+  - Admin password is the real Firebase Auth password for that admin account.
+- Admin account is email-based (no npm/local script needed):
+  - Edit `ADMIN_EMAILS` in `main.js` (default: `admin@f1959.com`).
+  - That email gets admin dashboard access.
 - Notes are isolated by account (`ownerUid`), so one account cannot read another account's notes.
 
 ## 5) Deploy on GitHub Pages
@@ -83,17 +93,19 @@ Important:
 
 ## Admin account setup (see all users + delete history)
 
-1. Pick one Firebase Auth user as admin.
-2. Add custom claim `admin: true` using Firebase Admin SDK (run once in your trusted server environment):
-
-```js
-await admin.auth().setCustomUserClaims('ADMIN_UID_HERE', { admin: true });
-```
-
-3. That admin user will see:
+1. Create/login the admin user in Firebase Authentication (example: `admin@f1959.com`).
+2. In `main.js`, set that same email in `ADMIN_EMAILS`.
+3. In Firestore Rules, make sure `isAdmin()` email list includes the same email.
+4. That admin user will see:
    - **All user commits** (collection group view)
    - **Delete history** from `audit_logs`
-4. Normal users will not see admin panel and cannot read `audit_logs`.
+5. Normal users will not see admin panel and cannot read `audit_logs`.
+
+Quick checklist:
+- Firebase Auth has user `admin@f1959.com` with a strong password.
+- `main.js` contains `const ADMIN_EMAILS = ['admin@f1959.com'];`
+- Firestore Rules `isAdmin()` also contains `admin@f1959.com`.
+- Logout/login again after changes.
 
 ---
 
@@ -101,8 +113,10 @@ await admin.auth().setCustomUserClaims('ADMIN_UID_HERE', { admin: true });
 
 - Enter your account ID only (example: `abc` means `abc@f1959.com`).
   - Password is automatic and equals your ID (`abc`).
+- If you enter admin ID/email, enter admin password in the extra field.
 - Click **+ New note** to create notes.
 - Edit note title + text.
+- Click **Copy all** to copy all text in the current note body.
 - Click **Commit changes**.
 - See recent commits for the selected note.
 - Click **Delete note** if needed.
@@ -115,4 +129,4 @@ await admin.auth().setCustomUserClaims('ADMIN_UID_HERE', { admin: true });
 - **Login failed (`auth/invalid-credential`)**: wrong email/password or user account not created.
 - **No notes visible / write errors**: Firestore rules were not applied.
 - **The query requires an index**: fixed in current code by removing the composite-index query pattern.
-- **Admin dashboard not visible**: admin custom claim is missing (`admin: true`) or token needs refresh (logout/login again).
+- **Admin dashboard not visible**: check `ADMIN_EMAILS` in `main.js` and `isAdmin()` email list in Firestore rules, then logout/login.
