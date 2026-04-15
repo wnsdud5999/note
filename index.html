@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Shared Firebase Notes</title>
+    <style>
+      :root {
+        font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+        color: #ececf1;
+      }
+      body { margin: 0; background: #202123; }
+      .container { max-width: 1180px; margin: 28px auto; padding: 0 16px; }
+      .card {
+        background: #343541;
+        border: 1px solid #4a4b58;
+        border-radius: 14px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28);
+        padding: 18px;
+      }
+      h1, h2, h3 { margin: 0 0 10px; }
+      .hidden { display: none; }
+      .row { display: flex; gap: 10px; align-items: center; margin-top: 12px; flex-wrap: wrap; }
+      input, textarea, button {
+        border: 1px solid #565869;
+        border-radius: 10px;
+        padding: 10px 12px;
+        font-size: 0.92rem;
+      }
+      input, textarea {
+        color: #ececf1;
+        background: #40414f;
+      }
+      button { background: #10a37f; color: #ffffff; border-color: #10a37f; cursor: pointer; }
+      button.secondary { background: #40414f; color: #ececf1; border-color: #565869; }
+      button.danger { background: #ef4444; border-color: #ef4444; }
+      textarea { width: 100%; min-height: 420px; box-sizing: border-box; resize: vertical; }
+      .status { font-size: 0.9rem; color: #c5c5d2; }
+      #loginCard { max-width: 430px; margin: 90px auto; }
+      .appGrid { display: grid; grid-template-columns: 300px 1fr; gap: 14px; }
+      .panel { border: 1px solid #4a4b58; border-radius: 12px; padding: 12px; background: #2f303a; }
+      .noteList { list-style: none; padding: 0; margin: 0; max-height: 460px; overflow: auto; }
+      .noteList li { display: flex; justify-content: space-between; gap: 8px; padding: 8px; border-radius: 8px; cursor: pointer; }
+      .noteList li.active { background: #40414f; }
+      .noteList small { color: #c5c5d2; display: block; }
+      .commits { margin-top: 12px; border-top: 1px solid #4a4b58; padding-top: 12px; }
+      .commits ul { list-style: none; margin: 0; padding: 0; }
+      .commits li { margin: 8px 0; font-size: 0.9rem; color: #ececf1; }
+      .adminPanel { margin-top: 14px; border: 1px solid #4a4b58; border-radius: 12px; padding: 12px; background: #2f303a; }
+      .adminGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+      .pager { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+      .modal {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.55);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+      }
+      .modal.hidden { display: none; }
+      .modalCard {
+        width: min(420px, calc(100vw - 32px));
+        background: #2f303a;
+        border: 1px solid #4a4b58;
+        border-radius: 12px;
+        padding: 14px;
+      }
+      ::placeholder { color: #b4b4c6; }
+      @media (max-width: 900px) {
+        .appGrid { grid-template-columns: 1fr; }
+        .adminGrid { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div id="loginCard" class="card">
+        <div class="row">
+          <input id="emailInput" type="text" placeholder="" style="flex: 1" />
+          <button id="loginBtn" aria-label="Login">→</button>
+        </div>
+        <p id="loginStatus" class="status"></p>
+      </div>
+
+      <div id="appCard" class="card hidden">
+        <div class="row" style="justify-content: space-between; margin-top: 0">
+          <h1>Shared notes</h1>
+          <button id="logoutBtn" class="secondary">Logout</button>
+        </div>
+        <p id="appStatus" class="status">Connected.</p>
+
+        <div class="appGrid">
+          <div class="panel">
+            <div class="row" style="margin-top: 0">
+              <h3 style="margin: 0">Notes</h3>
+              <button id="newNoteBtn" class="secondary">+ New note</button>
+            </div>
+            <ul id="noteList" class="noteList"></ul>
+          </div>
+
+          <div class="panel">
+            <div class="row" style="margin-top: 0">
+              <input id="noteTitleInput" placeholder="Note title" style="flex: 1; box-sizing: border-box" />
+              <button id="copyAllBtn" class="secondary">Copy all</button>
+            </div>
+            <textarea id="editor" placeholder="Write here..."></textarea>
+
+            <div class="row">
+              <input id="authorInput" placeholder="Your name (optional)" />
+              <input id="messageInput" placeholder="Commit message (optional)" style="flex: 1" />
+              <button id="commitBtn">Commit changes</button>
+              <button id="deleteNoteBtn" class="danger">Delete note</button>
+            </div>
+
+            <div class="commits">
+              <h3>Recent commits (selected note)</h3>
+              <ul id="commitList"></ul>
+            </div>
+          </div>
+        </div>
+
+        <div id="adminPanel" class="adminPanel hidden">
+          <h3>Admin dashboard</h3>
+          <div class="adminGrid">
+            <div class="commits">
+              <h3>All user commits</h3>
+              <ul id="adminCommitList"></ul>
+              <div class="pager">
+                <button id="adminCommitsPrevBtn" class="secondary">Prev</button>
+                <span id="adminCommitsPage" class="status">Page 1</span>
+                <button id="adminCommitsNextBtn" class="secondary">Next</button>
+              </div>
+            </div>
+            <div class="commits">
+              <h3>Delete history</h3>
+              <ul id="adminDeleteList"></ul>
+              <div class="pager">
+                <button id="adminDeletesPrevBtn" class="secondary">Prev</button>
+                <span id="adminDeletesPage" class="status">Page 1</span>
+                <button id="adminDeletesNextBtn" class="secondary">Next</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="adminPasswordModal" class="modal hidden">
+      <div class="modalCard">
+        <h3>관리자 비밀번호</h3>
+        <input id="adminPasswordModalInput" type="password" style="width: 100%; box-sizing: border-box" />
+        <div class="row" style="justify-content: flex-end">
+          <button id="adminPasswordCancelBtn" class="secondary">취소</button>
+          <button id="adminPasswordConfirmBtn">확인</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="detailModal" class="modal hidden">
+      <div class="modalCard">
+        <h3 id="detailModalTitle">상세 보기</h3>
+        <textarea id="detailModalContent" readonly style="min-height: 260px"></textarea>
+        <div class="row" style="justify-content: flex-end">
+          <button id="detailModalDownloadBtn" class="secondary">TXT 다운로드</button>
+          <button id="detailModalCloseBtn">닫기</button>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>
