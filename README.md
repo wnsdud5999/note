@@ -74,6 +74,13 @@ service cloud.firestore {
       allow update: if false;
       allow delete: if isAdmin();
     }
+
+    match /admin_commits/{commitLogId} {
+      allow create: if signedIn();
+      allow read: if isAdmin();
+      allow update: if false;
+      allow delete: if isAdmin();
+    }
   }
 }
 ```
@@ -108,7 +115,7 @@ Important:
 2. In `main.js`, set that same email in `ADMIN_EMAILS`.
 3. In Firestore Rules, make sure `isAdmin()` email list includes the same email.
 4. That admin user will see:
-   - **All user commits** (collection group view)
+   - **All user commits** (`admin_commits` feed)
    - **Delete history** from `audit_logs`
    - Click each history row to see full detail (user/date/content snapshot)
    - In detail modal, click **TXT 다운로드** to save long content as a text file
@@ -149,4 +156,5 @@ Quick checklist:
 - **The query requires an index**: fixed in current code by removing the composite-index query pattern.
 - **Admin dashboard not visible**: check `ADMIN_EMAILS` in `main.js` and `isAdmin()` email list in Firestore rules, then logout/login.
 - **Admin can login but sees permission errors / no data**: Firestore Rules `isAdmin()` email mismatch or rules not published yet.
+- **Delete is visible but All user commits is empty**: make sure `admin_commits` rules block is added and published.
 - **Delete history does not auto-clean after 30 days**: update Firestore Rules so admin can delete `audit_logs` entries.

@@ -8,7 +8,6 @@ import {
 import {
   getFirestore,
   collection,
-  collectionGroup,
   addDoc,
   deleteDoc,
   doc,
@@ -293,6 +292,16 @@ async function ensureInitialData() {
       titleSnapshot: 'Welcome note',
       contentSnapshot: 'Welcome!\n\nCreate notes, edit title/content, and commit changes.'
     });
+
+    await writeAdminCommit({
+      noteId: noteRef.id,
+      ownerUid: user.uid,
+      actorEmail: user.email || null,
+      author: 'system',
+      message: 'Initial note created',
+      titleSnapshot: 'Welcome note',
+      contentSnapshot: 'Welcome!\n\nCreate notes, edit title/content, and commit changes.'
+    });
   }
 }
 
@@ -320,6 +329,16 @@ async function createNote() {
     ts: serverTimestamp(),
     ownerUid: user.uid,
     actorEmail: user.email || null,
+    titleSnapshot: title,
+    contentSnapshot: ''
+  });
+
+  await writeAdminCommit({
+    noteId: noteRef.id,
+    ownerUid: user.uid,
+    actorEmail: user.email || null,
+    author,
+    message: `Created note "${title}"`,
     titleSnapshot: title,
     contentSnapshot: ''
   });
@@ -358,6 +377,16 @@ async function commitCurrentNote() {
       contentSnapshot: editor.value
     });
 
+    await writeAdminCommit({
+      noteId: selectedNoteId,
+      ownerUid: getUser()?.uid || null,
+      actorEmail: getUser()?.email || null,
+      author,
+      message,
+      titleSnapshot: noteTitleInput.value.trim() || 'Untitled note',
+      contentSnapshot: editor.value
+    });
+
     messageInput.value = '';
     setStatus('Committed! Everyone will see this note update.');
   } catch (err) {
@@ -365,6 +394,19 @@ async function commitCurrentNote() {
   } finally {
     commitBtn.disabled = false;
   }
+}
+
+async function writeAdminCommit(entry) {
+  await addDoc(collection(db, 'admin_commits'), {
+    noteId: entry.noteId || null,
+    ownerUid: entry.ownerUid || null,
+    actorEmail: entry.actorEmail || null,
+    author: entry.author || 'anonymous',
+    message: entry.message || 'Updated note',
+    titleSnapshot: entry.titleSnapshot || null,
+    contentSnapshot: entry.contentSnapshot || '',
+    ts: serverTimestamp()
+  });
 }
 
 async function deleteCurrentNote() {
@@ -496,7 +538,7 @@ function startAdminListeners() {
 
   showAdminPanel();
 
-  const allCommitsQuery = query(collectionGroup(db, 'commits'), limit(200));
+  const allCommitsQuery = query(collection(db, 'admin_commits'), orderBy('ts', 'desc'), limit(200));
   unsubAdminCommits = onSnapshot(
     allCommitsQuery,
     (snapshot) => {
