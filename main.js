@@ -16,6 +16,7 @@ import {
   orderBy,
   query,
   serverTimestamp,
+  setDoc,
   where,
   limit,
   startAfter,
@@ -267,10 +268,7 @@ async function ensureInitialData() {
 
   if (!hasAnyNote) {
     const noteRef = doc(collection(db, 'notes'));
-    const noteCommitRef = doc(collection(db, 'notes', noteRef.id, 'commits'));
-    const batch = writeBatch(db);
-
-    batch.set(noteRef, {
+    await setDoc(noteRef, {
       title: 'Welcome note',
       content: 'Welcome!\n\nCreate notes, edit title/content, and commit changes.',
       updatedAt: serverTimestamp(),
@@ -278,7 +276,7 @@ async function ensureInitialData() {
       ownerUid: user.uid
     });
 
-    batch.set(noteCommitRef, {
+    await addDoc(collection(db, 'notes', noteRef.id, 'commits'), {
       author: 'system',
       message: 'Initial note created',
       ts: serverTimestamp(),
@@ -287,8 +285,6 @@ async function ensureInitialData() {
       titleSnapshot: 'Welcome note',
       contentSnapshot: 'Welcome!\n\nCreate notes, edit title/content, and commit changes.'
     });
-
-    await batch.commit();
     await tryWriteAdminCommit({
       noteId: noteRef.id,
       ownerUid: user.uid,
@@ -310,10 +306,7 @@ async function createNote() {
   const user = getUser();
   if (!user) return;
   const noteRef = doc(collection(db, 'notes'));
-  const noteCommitRef = doc(collection(db, 'notes', noteRef.id, 'commits'));
-  const batch = writeBatch(db);
-
-  batch.set(noteRef, {
+  await setDoc(noteRef, {
     title,
     content: '',
     updatedAt: serverTimestamp(),
@@ -321,7 +314,7 @@ async function createNote() {
     ownerUid: user.uid
   });
 
-  batch.set(noteCommitRef, {
+  await addDoc(collection(db, 'notes', noteRef.id, 'commits'), {
     author,
     message: `Created note "${title}"`,
     ts: serverTimestamp(),
@@ -331,7 +324,6 @@ async function createNote() {
     contentSnapshot: ''
   });
 
-  await batch.commit();
   await tryWriteAdminCommit({
     noteId: noteRef.id,
     ownerUid: user.uid,
