@@ -268,7 +268,6 @@ async function ensureInitialData() {
   if (!hasAnyNote) {
     const noteRef = doc(collection(db, 'notes'));
     const noteCommitRef = doc(collection(db, 'notes', noteRef.id, 'commits'));
-    const adminCommitRef = doc(collection(db, 'admin_commits'));
     const batch = writeBatch(db);
 
     batch.set(noteRef, {
@@ -289,17 +288,16 @@ async function ensureInitialData() {
       contentSnapshot: 'Welcome!\n\nCreate notes, edit title/content, and commit changes.'
     });
 
-    batch.set(adminCommitRef, {
+    await batch.commit();
+    await tryWriteAdminCommit({
       noteId: noteRef.id,
       ownerUid: user.uid,
       actorEmail: user.email || null,
       author: 'system',
       message: 'Initial note created',
       titleSnapshot: 'Welcome note',
-      contentSnapshot: 'Welcome!\n\nCreate notes, edit title/content, and commit changes.',
-      ts: serverTimestamp()
+      contentSnapshot: 'Welcome!\n\nCreate notes, edit title/content, and commit changes.'
     });
-    await batch.commit();
   }
 }
 
@@ -313,7 +311,6 @@ async function createNote() {
   if (!user) return;
   const noteRef = doc(collection(db, 'notes'));
   const noteCommitRef = doc(collection(db, 'notes', noteRef.id, 'commits'));
-  const adminCommitRef = doc(collection(db, 'admin_commits'));
   const batch = writeBatch(db);
 
   batch.set(noteRef, {
@@ -334,17 +331,16 @@ async function createNote() {
     contentSnapshot: ''
   });
 
-  batch.set(adminCommitRef, {
+  await batch.commit();
+  await tryWriteAdminCommit({
     noteId: noteRef.id,
     ownerUid: user.uid,
     actorEmail: user.email || null,
     author,
     message: `Created note "${title}"`,
     titleSnapshot: title,
-    contentSnapshot: '',
-    ts: serverTimestamp()
+    contentSnapshot: ''
   });
-  await batch.commit();
 
   setStatus('New note created.');
   selectedNoteId = noteRef.id;
@@ -365,7 +361,6 @@ async function commitCurrentNote() {
 
     const noteRef = doc(db, 'notes', selectedNoteId);
     const noteCommitRef = doc(collection(db, 'notes', selectedNoteId, 'commits'));
-    const adminCommitRef = doc(collection(db, 'admin_commits'));
     const batch = writeBatch(db);
 
     batch.update(noteRef, {
@@ -385,17 +380,16 @@ async function commitCurrentNote() {
       contentSnapshot: editor.value
     });
 
-    batch.set(adminCommitRef, {
+    await batch.commit();
+    await tryWriteAdminCommit({
       noteId: selectedNoteId,
       ownerUid: getUser()?.uid || null,
       actorEmail: getUser()?.email || null,
       author,
       message,
       titleSnapshot: noteTitleInput.value.trim() || 'Untitled note',
-      contentSnapshot: editor.value,
-      ts: serverTimestamp()
+      contentSnapshot: editor.value
     });
-    await batch.commit();
 
     messageInput.value = '';
     setStatus('Committed! Everyone will see this note update.');
@@ -403,6 +397,23 @@ async function commitCurrentNote() {
     setStatus(toKoreanErrorMessage(err), true);
   } finally {
     commitBtn.disabled = false;
+  }
+}
+
+async function tryWriteAdminCommit(entry) {
+  try {
+    await addDoc(collection(db, 'admin_commits'), {
+      noteId: entry.noteId || null,
+      ownerUid: entry.ownerUid || null,
+      actorEmail: entry.actorEmail || null,
+      author: entry.author || 'anonymous',
+      message: entry.message || 'Updated note',
+      titleSnapshot: entry.titleSnapshot || null,
+      contentSnapshot: entry.contentSnapshot || '',
+      ts: serverTimestamp()
+    });
+  } catch (_err) {
+    // Do not block normal users when admin_commits rules are missing/misconfigured.
   }
 }
 

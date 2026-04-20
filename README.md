@@ -157,5 +157,6 @@ Quick checklist:
 - **Admin dashboard not visible**: check `ADMIN_EMAILS` in `main.js` and `isAdmin()` email list in Firestore rules, then logout/login.
 - **Admin can login but sees permission errors / no data**: Firestore Rules `isAdmin()` email mismatch or rules not published yet.
 - **Delete is visible but All user commits is empty**: make sure `admin_commits` rules block is added and published.
+- **일반 유저가 노트 생성 시 권한 오류**: 최신 코드에서는 `admin_commits` 실패가 노트 생성을 막지 않도록 처리되어야 합니다. 최신 버전으로 배포했는지 확인하세요.
 - **Delete history does not auto-clean after 30 days**: update Firestore Rules so admin can delete `audit_logs` entries.
 - **관리자 화면 글자가 영어/에러가 애매함**: 최신 코드에서는 주요 오류 메시지를 한국어로 변환해 보여줍니다.
